@@ -4,11 +4,15 @@ import com.expertsoft.model.*;
 import com.expertsoft.util.AveragingBigDecimalCollector;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
+
+import static java.util.Comparator.reverseOrder;
 
 /**
  * This class provides several methods to collect statistical information from customers and orders of an e-shop.
@@ -18,6 +22,12 @@ import java.util.stream.Stream;
  * Refer to the <code>com.expertsoft.model</code> package to observe the domain model of the shop.
  */
 class OrderStats {
+    public static final Comparator<Map.Entry<String, Long>> NAME_LENGTH_COMPARATOR =
+            Comparator.comparing(x -> x.getKey().length());
+    public static final Comparator<Map.Entry<String, Long>> VALUE_COMPARATOR =
+            Map.Entry.comparingByValue(reverseOrder());
+    public static final Comparator<Map.Entry<String, Long>> ENTRY_COMPARATOR =
+            VALUE_COMPARATOR.thenComparing(NAME_LENGTH_COMPARATOR);
 
     /**
      * Task 1 (⚫⚫⚪⚪⚪)
@@ -102,14 +112,11 @@ class OrderStats {
      * @return java.util.Optional containing the name of the most popular country
      */
     static Optional<String> mostPopularCountry(final Stream<Customer> customers) {
-        return customers.peek(customer -> System.out.println(customer.getAddress().getCountry()))
+        return customers
                 .collect(Collectors.groupingBy(customer -> customer.getAddress().getCountry(), Collectors.counting()))
                 .entrySet().stream()
-//                .peek(System.out::println)
-                .sorted((o1, o2) -> -o1.getValue().compareTo(o2.getValue()))
-//                .sorted((o1, o2) -> -o1.getKey().compareTo(o2.getKey()))
-//                .peek(System.out::println)
-                .map(Map.Entry::getKey).findFirst();
+                .min(ENTRY_COMPARATOR)
+                .map(Map.Entry::getKey);
     }
 
     /**
@@ -133,6 +140,14 @@ class OrderStats {
      */
     static BigDecimal averageProductPriceForCreditCard(final Stream<Customer> customers, final String cardNumber) {
         final AveragingBigDecimalCollector collector = new AveragingBigDecimalCollector();
-        return null;
+        return customers
+                .flatMap(customer -> customer.getOrders().stream())
+                .filter(order -> order.getPaymentInfo().getCardNumber().equals(cardNumber))
+                .flatMap(order -> order.getOrderItems().stream())
+                .flatMap(orderItem -> IntStream
+                        .rangeClosed(1, orderItem.getQuantity())
+                        .mapToObj(value -> orderItem.getProduct().getPrice()))
+                .peek(System.out::println)
+                .collect(collector);
     }
 }
